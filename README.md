@@ -9,7 +9,6 @@ A big limitation of `TemplateHaskell` is that it cannot modify the import list
 of a file. The only way to metaprogram with the imports is to use a source
 preprocessor like this.
 
-
 ## As an executable
 
 Let's say you've got a ton of `persistent` database models, all defined in a
@@ -49,6 +48,7 @@ that your Haskell modules are in:
 module Models.All where
 
 import Database.Persist.Sql
+-- GLOB_IMPORTS_SPLICE
 
 allEntities :: [EntityDef]
 allEntities = $(discoverEntities)
@@ -64,13 +64,13 @@ them qualified. The result would look like this:
 
 module Models.All where
 
+import Database.Persist.Sql
 import qualified Models.Foo
 import qualified Models.Bar
 import qualified Models.Baz
 import qualified Models.Blargh
 import qualified Models.What
 import qualified Models.OhNo
-import Database.Persist.Sql
 
 _importedModules :: [String]
 _importedModules =

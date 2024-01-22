@@ -50,6 +50,7 @@
 -- module PersistentModels.All where
 --
 -- import Database.Persist.Sql
+-- {- GLOB_IMPORTS_SPLICE -}
 --
 -- allEntityDefs :: [EntityDef]
 -- allEntityDefs = $(discoverEntities)
@@ -62,10 +63,10 @@
 --
 -- module PersistentModels.All where
 --
+-- import Database.Persist.Sql
 -- import qualified PersistentModels.Foo
 -- import qualified PersistentModels.Bar
 -- import qualified PersistentModels.Baz
--- import Database.Persist.Sql
 --
 -- allEntityDefs :: [EntityDef]
 -- allEntityDefs = $(discoverEntities)
@@ -90,50 +91,32 @@ import Data.Char
 import Control.Applicative
 import Data.Maybe
 
-newtype Source = Source FilePath
+-- | The source file location. This is the first argument passed to the
+-- preprocessor.
+newtype Source = Source { unSource :: FilePath }
 
-newtype Destination = Destination FilePath
+-- | The source file contents. This is the 'String' contained in the file of the
+-- second argument passed to the preprocessor.
+newtype SourceContents = SourceContents { unSourceContents :: String }
+
+-- | The destination file path to write the final source to. This is the third
+-- argument passed to the preprocessor.
+newtype Destination = Destination { unDestination :: FilePath }
 
 data AllModelsFile = AllModelsFile
     { amfModuleBase :: Module
     , amfModuleImports :: [Module]
     }
 
-render :: Render -> String
-render action =
-    unlines $ DList.toList $ execState (unRender action) mempty
-
-renderLine :: Render -> Render
-renderLine action =
-    fromString $ mconcat $ DList.toList $ execState (unRender action) mempty
-
-newtype Render' a = Render { unRender :: State (DList String) a }
-    deriving newtype
-        (Functor, Applicative, Monad)
-
-type Render = Render' ()
-
-instance (a ~ ()) => IsString (Render' a) where
-    fromString str =
-        Render (modify (\s -> s <> pure str))
-
-indent :: Int -> Render -> Render
-indent i doc =
-    Render do
-        let
-            new =
-                fmap (replicate i ' ' <>)
-                $ execState (unRender doc) mempty
-        modify (<> new)
-
 -- |
 --
 -- @since 0.1.0.0
-discoverModels
+spliceImports
     :: Source
+    -> SourceContents
     -> Destination
     -> IO ()
-discoverModels (Source src) (Destination dest) = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) = do
     let (dir, file) = splitFileName src
     files <- filter (/= file) <$> getFilesRecursive dir
     let
@@ -145,13 +128,15 @@ discoverModels (Source src) (Destination dest) = do
                     mapMaybe pathToModule (fmap (dir </>) files)
                 }
         output =
-            renderFile input
+            renderFile input srcContents
 
     writeFile dest output
 
 -- | Returns a list of relative paths to all files in the given directory.
-getFilesRecursive :: FilePath      -- ^ The directory to search.
-                  -> IO [FilePath]
+getFilesRecursive
+    :: FilePath
+    -- ^ The directory to search.
+    -> IO [FilePath]
 getFilesRecursive baseDir = sort <$> go []
   where
     go :: FilePath -> IO [FilePath]
@@ -164,50 +149,107 @@ getFilesRecursive baseDir = sort <$> go []
 renderFile
     :: AllModelsFile
     -> String
-renderFile amf = render do
-    let
-        modName =
-            moduleName $ amfModuleBase amf
-    renderLine do
-        "{-# LINE 1 "
-        fromString $ show modName
-        " #-}"
-    "{-# LANGUAGE TemplateHaskell #-}"
-    ""
-    renderLine do
-        "module "
-        fromString $ modName
-        " where"
-    ""
-    for_ (amfModuleImports amf) \mod' ->
-        renderLine do
-            "import "
-            fromString $ moduleName mod'
-            " ()"
-    ""
-    "import Database.Persist.TH (discoverEntities)"
-    "import Database.Persist.Types (EntityDef)"
-    ""
-    "-- | All of the entity definitions, as discovered by the @glob-imports@ utility."
-    "allEntityDefs :: [EntityDef]"
-    "allEntityDefs = $(discoverEntities)"
+    -> String
+renderFile amf originalContents =
+    concatMap unlines
+        [ modulePrior
+        , newImportLines
+        , newModuleRest
+        ]
+  where
+    originalLines =
+        lines originalContents
 
--- -- | Derive module name from specified path.
--- pathToModule :: FilePath -> Module
--- pathToModule f =
---     Module
---         { moduleName =
---             intercalate "." $ mapMaybe go $ splitDirectories f
---         , modulePath =
---             f
---         }
---   where
---     go :: String -> Maybe String
---     go (c:cs) =
---         Just (toUpper c : cs)
---     fileName = last $ splitDirectories f
---     m:ms = takeWhile (/='.') fileName
+    (modulePrior, moduleRest) =
+        case break ("GLOB_IMPORTS_SPLICE" `isInfixOf`) originalLines of
+            (_, []) ->
+                error $ unlines
+                    [ "While processing the module, I was unable to find a comment with GLOB_IMPORTS_SPLICE."
+                    , "I need this to know where to splice imports into the file. Please add a comment like "
+                    , "this to the source file in the import section: "
+                    , ""
+                    , "-- GLOB_IMPORTS_SPLICE"
+                    ]
+            (prior, (_globImportLine : rest)) ->
+                (prior, rest)
 
+    newModuleRest =
+        let
+            (remainingModule, lastImportLine) =
+                break ("import" `isPrefixOf`) (reverse moduleRest)
+            quoteModuleName mod' =
+                "\"" <> moduleName mod' <> "\""
+            mkFirstModuleLine mod' =
+                "  [ " <> quoteModuleName mod'
+            mkRestModuleLine mod' =
+                "  , " <> quoteModuleName mod'
+            newLines =
+                reverse case amfModuleImports amf of
+                    [] ->
+                        []
+                    (firstModule : restModules) ->
+                        [ "_importedModules :: [String]"
+                        , "_importedModules ="
+                        , mkFirstModuleLine firstModule
+                        ] <> map mkRestModuleLine restModules
+                          <> [ "  ]"]
+         in
+            reverse (concat [remainingModule, newLines, lastImportLine])
+
+    newImportLines =
+        map (\mod' -> "import qualified " <> moduleName mod') (amfModuleImports amf)
+
+
+
+
+
+
+
+--     render do
+--     let
+--         modName =
+--             moduleName $ amfModuleBase amf
+--     renderLine do
+--         "{-# LINE 1 "
+--         fromString $ show modName
+--         " #-}"
+--     "{-# LANGUAGE TemplateHaskell #-}"
+--     ""
+--     renderLine do
+--         "module "
+--         fromString $ modName
+--         " where"
+--     ""
+--     for_ (amfModuleImports amf) \mod' ->
+--         renderLine do
+--             "import "
+--             fromString $ moduleName mod'
+--             " ()"
+--     ""
+--     "import Database.Persist.TH (discoverEntities)"
+--     "import Database.Persist.Types (EntityDef)"
+--     ""
+--     "-- | All of the entity definitions, as discovered by the @glob-imports@ utility."
+--     "allEntityDefs :: [EntityDef]"
+--     "allEntityDefs = $(discoverEntities)"
+--
+-- -- -- | Derive module name from specified path.
+-- -- pathToModule :: FilePath -> Module
+-- -- pathToModule f =
+-- --     Module
+-- --         { moduleName =
+-- --             intercalate "." $ mapMaybe go $ splitDirectories f
+-- --         , modulePath =
+-- --             f
+-- --         }
+-- --   where
+-- --     go :: String -> Maybe String
+-- --     go (c:cs) =
+-- --         Just (toUpper c : cs)
+-- --     fileName = last $ splitDirectories f
+-- --     m:ms = takeWhile (/='.') fileName
+
+-- |
 data Module = Module
     { moduleName :: String
     , modulePath :: FilePath
@@ -246,12 +288,15 @@ pathToModule file = do
             empty
         x : xs ->  do
             guard $ all isValidModuleName (x : xs)
-            pure (Module (intercalate "." (x:xs)) file)
+            pure Module
+                { moduleName = intercalate "." (x:xs)
+                , modulePath = file
+                }
 
 -- | Returns True if the given string is a valid task module name.
 -- See `Cabal.Distribution.ModuleName` (http://git.io/bj34)
 isValidModuleName :: String -> Bool
-isValidModuleName []     = False
+isValidModuleName [] = False
 isValidModuleName (c:cs) = isUpper c && all isValidModuleChar cs
 
 -- | Returns True if the given Char is a valid taks module character.

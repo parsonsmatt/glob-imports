@@ -7,45 +7,73 @@ import System.FilePath
 spec :: Spec
 spec = do
     describe "renderFile" do
-        it "should have TemplateHaskell pragma" do
-            let rendered  =
-                    renderFile AllModelsFile
-                        { amfModuleBase =
-                            Module
-                                { moduleName = "Asdf"
-                                , modulePath = "src/Asdf.hs"
-                                }
-                        , amfModuleImports =
-                            []
-                        }
-                firstLines =
-                    unlines . take 4 . lines $ rendered
-                expected =
-                    render do
-                        "{-# LINE 1 \"Asdf\" #-}"
-                        "{-# LANGUAGE TemplateHaskell #-}"
-                        ""
-                        "module Asdf where"
-            firstLines `shouldBe` expected
-
-    describe "Render" do
-        it "works" do
-            shouldBe
-                do render do
-                    "hello"
-                    "world"
-                do
-                    "hello\nworld\n"
-        describe "indent" do
-            it "works" do
-                shouldBe
-                    do render do
-                        "hello"
-                        indent 4 do
-                            "world"
-                        "goodbye"
-                    do
-                        "hello\n    world\ngoodbye\n"
+        let allModelsFile =
+                AllModelsFile
+                    { amfModuleBase =
+                        Module
+                            { moduleName = "Foo.Bar"
+                            , modulePath = "src/Foo/Bar.hs"
+                            }
+                    , amfModuleImports =
+                        [ Module
+                            { moduleName = "Foo.Bar.Quux"
+                            , modulePath = "src/Foo/Bar/Quux.hs"
+                            }
+                        ]
+                    }
+        it "errors without a GLOB_IMPORTS_SPLICE marker" do
+            (pure $! length (renderFile allModelsFile (unlines
+                [ "module Foo.Bar where"
+                , ""
+                , "import Blah"
+                ])))
+                `shouldThrow` anyErrorCall
+        it "works with a GLOB_IMPORTS_SPLICE marker" do
+            renderFile allModelsFile
+                (unlines
+                    [ "module Foo.Bar where"
+                    , ""
+                    , "import Blah"
+                    , "-- GLOB_IMPORTS_SPLICE"
+                    ])
+                `shouldBe`
+                    unlines
+                        [ "module Foo.Bar where"
+                        , ""
+                        , "import Blah"
+                        , "import qualified Foo.Bar.Quux"
+                        , "_importedModules :: [String]"
+                        , "_importedModules ="
+                        , "  [ \"Foo.Bar.Quux\""
+                        , "  ]"
+                        ]
+        it "can handle imports after glob import splice" do
+            renderFile allModelsFile
+                (unlines
+                    [ "module Foo.Bar where"
+                    , ""
+                    , "import Blah"
+                    , "-- GLOB_IMPORTS_SPLICE"
+                    , "import Boo"
+                    , ""
+                    , "baz :: Int"
+                    , "baz = 3"
+                    ])
+                `shouldBe`
+                    unlines
+                        [ "module Foo.Bar where"
+                        , ""
+                        , "import Blah"
+                        , "import qualified Foo.Bar.Quux"
+                        , "import Boo"
+                        , "_importedModules :: [String]"
+                        , "_importedModules ="
+                        , "  [ \"Foo.Bar.Quux\""
+                        , "  ]"
+                        , ""
+                        , "baz :: Int"
+                        , "baz = 3"
+                        ]
 
     describe "mkModulePieces" do
         let
