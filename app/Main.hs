@@ -1,6 +1,7 @@
 module Main where
 
 import GlobImports.Exe
+import System.IO (readFile')
 import System.Environment (getArgs)
 
 main :: IO ()
