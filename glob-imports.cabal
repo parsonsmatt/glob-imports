@@ -5,10 +5,10 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           glob-imports
-version:        0.1.0.0
-synopsis:       Persistent module discover utilities
-description:    This package provides an executable for discovering Persistent model definition files, as well as a library function to glob all persistent model files. Please see the README on GitHub at <https://github.com/parsonsmatt/glob-imports#readme>
-category:       Web
+version:        0.0.1.0
+synopsis:       Import modules for metaprogramming
+description:    This package provides an executable for importing modules in a directory and splicing those in. Please see the README on GitHub at <https://github.com/parsonsmatt/glob-imports#readme>
+category:       Metaprogramming
 homepage:       https://github.com/parsonsmatt/glob-imports#readme
 bug-reports:    https://github.com/parsonsmatt/glob-imports/issues
 author:         Matt Parsons
