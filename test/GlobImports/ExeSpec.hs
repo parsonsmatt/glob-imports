@@ -1,7 +1,7 @@
-module Database.Persist.Discover.ExeSpec where
+module GlobImports.ExeSpec where
 
 import Test.Hspec
-import Database.Persist.Discover.Exe
+import GlobImports.Exe
 import System.FilePath
 
 spec :: Spec
