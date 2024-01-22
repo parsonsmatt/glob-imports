@@ -1,0 +1,81 @@
+name:                glob-imports
+version:             0.1.0.0
+github:              "parsonsmatt/glob-imports"
+license:             BSD3
+author:              "Matt Parsons"
+maintainer:          "parsonsmatt@gmail.com"
+copyright:           "Matt Parsons"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+synopsis:            Persistent module discover utilities
+category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         This package provides an executable for discovering Persistent model definition files, as well as a library function to glob all persistent model files. Please see the README on GitHub at <https://github.com/parsonsmatt/glob-imports#readme>
+
+dependencies:
+- base >= 4.12 && < 5
+- mtl
+- filepath
+- dlist
+- directory
+- persistent >= 2.13.0.0
+- template-haskell >= 2.16.0.0
+- file-embed
+- discover-instances
+- some-dict-of
+- text
+
+ghc-options:
+    - -Wall
+
+default-extensions:
+    - BlockArguments
+    - DataKinds
+    - DerivingStrategies
+    - DerivingStrategies
+    - FlexibleInstances
+    - FlexibleInstances
+    - GADTs
+    - GeneralizedNewtypeDeriving
+    - MultiParamTypeClasses
+    - OverloadedStrings
+    - StandaloneDeriving
+    - TypeFamilies
+    - TypeFamilies
+    - TypeOperators
+
+library:
+  source-dirs: ./src
+
+executables:
+  glob-imports:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - glob-imports
+
+tests:
+  glob-imports-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - glob-imports
+    - hspec
+    - hspec-discover
+    build-tools:
+    - hspec-discover
