@@ -79,6 +79,7 @@
 module GlobImports.Exe where
 
 import System.FilePath
+import System.FilePath.Glob (Pattern, compile, match)
 import Control.Monad (guard, filterM)
 import Control.Monad.State
 import Data.String
@@ -108,6 +109,43 @@ data AllModelsFile = AllModelsFile
     , amfModuleImports :: [Module]
     }
 
+data GlobOptions = GlobOptions { globOptionsSearchDir :: Maybe FilePath
+                               , globOptionsPattern :: Maybe Pattern
+                               }
+                 deriving (Show)
+
+instance Semigroup GlobOptions where
+  (<>) l r = GlobOptions { globOptionsSearchDir = foldr (<|>) Nothing $ globOptionsSearchDir <$> [l, r]
+                         , globOptionsPattern = foldr (<|>) Nothing $ globOptionsPattern <$> [l, r]
+                         }
+
+instance Monoid GlobOptions where
+  mempty = GlobOptions { globOptionsSearchDir = Nothing
+                       , globOptionsPattern = Nothing
+                       }
+
+parseOptions :: String -> GlobOptions
+parseOptions s = GlobOptions { globOptionsSearchDir = searchDir s
+                             , globOptionsPattern = globPattern s
+                             }
+  where
+    getOption :: String -> String -> Maybe String
+    getOption n s = fmap (drop (length n)) <$> mfirst $ filter (n `isPrefixOf`) (words s)
+
+    searchDir :: String -> Maybe FilePath
+    searchDir = getOption "search_dir="
+
+    globPattern :: String -> Maybe Pattern
+    globPattern s = compile <$> getOption "pattern=" s
+
+    mfirst [] = Nothing
+    mfirst (f : r) = Just f
+
+extractOptions :: String -> GlobOptions
+extractOptions str = mconcat $ parseOptions <$> optionLines
+  where
+    optionLines = filter ("GLOB_IMPORTS_OPTIONS" `isInfixOf`) (lines str)
+
 -- |
 --
 -- @since 0.1.0.0
@@ -117,15 +155,18 @@ spliceImports
     -> Destination
     -> IO ()
 spliceImports (Source src) (SourceContents srcContents) (Destination dest) = do
-    let (dir, file) = splitFileName src
-    files <- filter (/= file) <$> getFilesRecursive dir
+    let
+      opts = extractOptions srcContents
+      (sourceDir, file) = splitFileName src
+      searchDir = fromMaybe sourceDir $ globOptionsSearchDir opts
+    files <- filter (/= file) <$> getFilesRecursive searchDir (globOptionsPattern opts)
     let
         input =
             AllModelsFile
                 { amfModuleBase =
                     fromJust $ pathToModule src
                 , amfModuleImports =
-                    mapMaybe pathToModule (fmap (dir </>) files)
+                    mapMaybe pathToModule (fmap (searchDir </>) files)
                 }
         output =
             renderFile input srcContents
@@ -136,8 +177,14 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) = do
 getFilesRecursive
     :: FilePath
     -- ^ The directory to search.
+    -> Maybe Pattern
+    -- ^ The glob pattern to filter with.
     -> IO [FilePath]
-getFilesRecursive baseDir = sort <$> go []
+getFilesRecursive baseDir mpat = do
+  files <- (sort <$> go [])
+  pure $ case mpat of
+           Just pat -> filter (match pat) files
+           Nothing -> files
   where
     go :: FilePath -> IO [FilePath]
     go dir = do
@@ -170,7 +217,7 @@ renderFile amf originalContents =
                     , ""
                     , "-- GLOB_IMPORTS_SPLICE"
                     ]
-            (prior, (_globImportLine : rest)) ->
+            (prior, (globImportLine : rest)) ->
                 (prior, rest)
 
     newModuleRest =
