@@ -79,18 +79,22 @@
 module GlobImports.Exe where
 
 import System.FilePath
-import System.FilePath.Glob (Pattern, compile, match)
-import Control.Monad (guard, filterM)
+import Control.Monad (guard, filterM, join)
 import Control.Monad.State
 import Data.String
 import Data.DList (DList(..))
 import qualified Data.DList as DList
+import qualified Data.ByteString.Lazy as LBS
 import Data.Foldable (for_)
 import System.Directory
-import Data.List
 import Data.Char
+import Data.List
+import qualified Data.Text as Text
+import Data.Text.Encoding (decodeUtf8)
 import Control.Applicative
 import Data.Maybe
+import System.Process.Typed
+import System.FilePath.Glob
 
 -- | The source file location. This is the first argument passed to the
 -- preprocessor.
@@ -109,43 +113,6 @@ data AllModelsFile = AllModelsFile
     , amfModuleImports :: [Module]
     }
 
-data GlobOptions = GlobOptions { globOptionsSearchDir :: Maybe FilePath
-                               , globOptionsPattern :: Maybe Pattern
-                               }
-                 deriving (Show)
-
-instance Semigroup GlobOptions where
-  (<>) l r = GlobOptions { globOptionsSearchDir = foldr (<|>) Nothing $ globOptionsSearchDir <$> [l, r]
-                         , globOptionsPattern = foldr (<|>) Nothing $ globOptionsPattern <$> [l, r]
-                         }
-
-instance Monoid GlobOptions where
-  mempty = GlobOptions { globOptionsSearchDir = Nothing
-                       , globOptionsPattern = Nothing
-                       }
-
-parseOptions :: String -> GlobOptions
-parseOptions s = GlobOptions { globOptionsSearchDir = searchDir s
-                             , globOptionsPattern = globPattern s
-                             }
-  where
-    getOption :: String -> String -> Maybe String
-    getOption n s = fmap (drop (length n)) <$> mfirst $ filter (n `isPrefixOf`) (words s)
-
-    searchDir :: String -> Maybe FilePath
-    searchDir = getOption "search_dir="
-
-    globPattern :: String -> Maybe Pattern
-    globPattern s = compile <$> getOption "pattern=" s
-
-    mfirst [] = Nothing
-    mfirst (f : r) = Just f
-
-extractOptions :: String -> GlobOptions
-extractOptions str = mconcat $ parseOptions <$> optionLines
-  where
-    optionLines = filter ("GLOB_IMPORTS_OPTIONS" `isInfixOf`) (lines str)
-
 -- |
 --
 -- @since 0.1.0.0
@@ -153,13 +120,17 @@ spliceImports
     :: Source
     -> SourceContents
     -> Destination
+    -> Maybe FilePath
+    -> String
     -> IO ()
-spliceImports (Source src) (SourceContents srcContents) (Destination dest) = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat = do
     let
-      opts = extractOptions srcContents
       (sourceDir, file) = splitFileName src
-      searchDir = fromMaybe sourceDir $ globOptionsSearchDir opts
-    files <- filter (/= file) <$> getFilesRecursive searchDir (globOptionsPattern opts)
+      searchDir = fromMaybe sourceDir msearchDir
+    eitherFiles <- fmap (filter (/= src)) <$> getFiles searchDir pat
+    files <- case eitherFiles of
+      Left e -> error e
+      Right f -> pure f
     let
         input =
             AllModelsFile
@@ -174,24 +145,17 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) = do
     writeFile dest output
 
 -- | Returns a list of relative paths to all files in the given directory.
-getFilesRecursive
+getFiles
     :: FilePath
-    -- ^ The directory to search.
-    -> Maybe Pattern
     -- ^ The glob pattern to filter with.
-    -> IO [FilePath]
-getFilesRecursive baseDir mpat = do
-  files <- (sort <$> go [])
-  pure $ case mpat of
-           Just pat -> filter (match pat) files
-           Nothing -> files
-  where
-    go :: FilePath -> IO [FilePath]
-    go dir = do
-      c <- map (dir </>) . filter (`notElem` [".", ".."]) <$> getDirectoryContents (baseDir </> dir)
-      dirs <- filterM (doesDirectoryExist . (baseDir </>)) c >>= mapM go
-      files <- filterM (doesFileExist . (baseDir </>)) c
-      return (files ++ concat dirs)
+    -> String
+    -- ^ The directory to search.
+    -> IO (Either String [FilePath])
+getFiles baseDir pat = do
+    (exitCode, out, err) <- readProcess $ proc "find" [baseDir, "-wholename", pat]
+    pure $ case exitCode of
+         ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
+         ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
 
 renderFile
     :: AllModelsFile
@@ -217,7 +181,7 @@ renderFile amf originalContents =
                     , ""
                     , "-- GLOB_IMPORTS_SPLICE"
                     ]
-            (prior, (globImportLine : rest)) ->
+            (prior, (_globImportLine : rest)) ->
                 (prior, rest)
 
     newModuleRest =
@@ -245,56 +209,6 @@ renderFile amf originalContents =
 
     newImportLines =
         map (\mod' -> "import qualified " <> moduleName mod') (amfModuleImports amf)
-
-
-
-
-
-
-
---     render do
---     let
---         modName =
---             moduleName $ amfModuleBase amf
---     renderLine do
---         "{-# LINE 1 "
---         fromString $ show modName
---         " #-}"
---     "{-# LANGUAGE TemplateHaskell #-}"
---     ""
---     renderLine do
---         "module "
---         fromString $ modName
---         " where"
---     ""
---     for_ (amfModuleImports amf) \mod' ->
---         renderLine do
---             "import "
---             fromString $ moduleName mod'
---             " ()"
---     ""
---     "import Database.Persist.TH (discoverEntities)"
---     "import Database.Persist.Types (EntityDef)"
---     ""
---     "-- | All of the entity definitions, as discovered by the @glob-imports@ utility."
---     "allEntityDefs :: [EntityDef]"
---     "allEntityDefs = $(discoverEntities)"
---
--- -- -- | Derive module name from specified path.
--- -- pathToModule :: FilePath -> Module
--- -- pathToModule f =
--- --     Module
--- --         { moduleName =
--- --             intercalate "." $ mapMaybe go $ splitDirectories f
--- --         , modulePath =
--- --             f
--- --         }
--- --   where
--- --     go :: String -> Maybe String
--- --     go (c:cs) =
--- --         Just (toUpper c : cs)
--- --     fileName = last $ splitDirectories f
--- --     m:ms = takeWhile (/='.') fileName
 
 -- |
 data Module = Module
