@@ -138,7 +138,7 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
         (sourceDir, file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
         excludePrefixFilter :: FilePath -> Bool
-        excludePrefixFilter = \target -> not $ foldr (||) False $ fmap (`isPrefixOf` target) prefixes
+        excludePrefixFilter = \target -> not $ foldr (||) False (fmap (`isPrefixOf` target) prefixes)
     printDebug debug $ "searching directory: " ++ searchDir
     printDebug debug $ "searching with pattern: " ++ pat
     printDebug debug $ "excluding file name: " ++ src
