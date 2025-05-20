@@ -21,7 +21,7 @@
 -- @
 -- -- src/PersistentModels/All.hs
 --
--- {-# OPTIONS_GHC -F -pgmF persistent-discover #-}
+-- {\-# OPTIONS_GHC -F -pgmF persistent-discover #-\}
 -- @
 --
 -- Then it will translate to:
@@ -45,12 +45,12 @@
 -- @
 -- -- src/PersistentModels/All.hs
 --
--- {-# OPTIONS_GHC -F -pgmF glob-imports #-}
+-- {\-# OPTIONS_GHC -F -pgmF glob-imports #-\}
 --
 -- module PersistentModels.All where
 --
 -- import Database.Persist.Sql
--- {- GLOB_IMPORTS_SPLICE -}
+-- {\- GLOB_IMPORTS_SPLICE -\}
 --
 -- allEntityDefs :: [EntityDef]
 -- allEntityDefs = $(discoverEntities)
@@ -78,40 +78,48 @@
 -- @since 0.1.0.0
 module GlobImports.Exe where
 
-import System.FilePath
-import Control.Monad (guard, filterM, join)
+import Control.Applicative
+import Control.Monad (guard)
 import Control.Monad.State
-import Data.String
-import Data.DList (DList(..))
-import qualified Data.DList as DList
 import qualified Data.ByteString.Lazy as LBS
-import Data.Foldable (for_)
-import System.Directory
 import Data.Char
+import Data.DList (DList (..))
+import qualified Data.DList as DList
+import Data.Foldable (for_)
 import Data.List
+import Data.Maybe
+import Data.String
 import qualified Data.Text as Text
 import Data.Text.Encoding (decodeUtf8)
-import Control.Applicative
-import Data.Maybe
-import System.Process.Typed
+import System.Directory
+import System.FilePath
 import System.FilePath.Glob
+import System.Process.Typed
 
 -- | The source file location. This is the first argument passed to the
 -- preprocessor.
-newtype Source = Source { unSource :: FilePath }
+newtype Source = Source {unSource :: FilePath}
 
 -- | The source file contents. This is the 'String' contained in the file of the
 -- second argument passed to the preprocessor.
-newtype SourceContents = SourceContents { unSourceContents :: String }
+newtype SourceContents = SourceContents {unSourceContents :: String}
 
 -- | The destination file path to write the final source to. This is the third
 -- argument passed to the preprocessor.
-newtype Destination = Destination { unDestination :: FilePath }
+newtype Destination = Destination {unDestination :: FilePath}
 
 data AllModelsFile = AllModelsFile
     { amfModuleBase :: Module
     , amfModuleImports :: [Module]
     }
+
+printDebug :: Bool -> String -> IO ()
+printDebug enabled str = do
+    if enabled
+        then
+            putStrLn $ "[DEBUG] " ++ str
+        else
+            pure ()
 
 -- |
 --
@@ -122,22 +130,32 @@ spliceImports
     -> Destination
     -> Maybe FilePath
     -> String
+    -> [String]
+    -> Bool
     -> IO ()
-spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat prefixes debug = do
     let
-      (sourceDir, file) = splitFileName src
-      searchDir = fromMaybe sourceDir msearchDir
+        (sourceDir, file) = splitFileName src
+        searchDir = fromMaybe sourceDir msearchDir
+        excludePrefixFilter :: FilePath -> Bool
+        excludePrefixFilter = \target -> not $ foldr (||) False $ fmap (`isPrefixOf` target) prefixes
+    printDebug debug $ "searching directory: " ++ searchDir
+    printDebug debug $ "searching with pattern: " ++ pat
+    printDebug debug $ "excluding file name: " ++ src
     eitherFiles <- fmap (filter (/= src)) <$> getFiles searchDir pat
     files <- case eitherFiles of
-      Left e -> error e
-      Right f -> pure f
+        Left e -> error e
+        Right f -> pure f
+    let
+        filteredFiles = filter excludePrefixFilter files
+    printDebug debug $ "including files:\n" ++ intercalate "\n|  " filteredFiles
     let
         input =
             AllModelsFile
                 { amfModuleBase =
                     fromJust $ pathToModule src
                 , amfModuleImports =
-                    mapMaybe pathToModule (fmap (searchDir </>) files)
+                    mapMaybe pathToModule (fmap (searchDir </>) filteredFiles)
                 }
         output =
             renderFile input srcContents
@@ -154,15 +172,16 @@ getFiles
 getFiles baseDir pat = do
     (exitCode, out, err) <- readProcess $ proc "find" [baseDir, "-wholename", pat]
     pure $ case exitCode of
-         ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
-         ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
+        ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
+        ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
 
 renderFile
     :: AllModelsFile
     -> String
     -> String
 renderFile amf originalContents =
-    concatMap unlines
+    concatMap
+        unlines
         [ modulePrior
         , newImportLines
         , newModuleRest
@@ -174,13 +193,14 @@ renderFile amf originalContents =
     (modulePrior, moduleRest) =
         case break ("GLOB_IMPORTS_SPLICE" `isInfixOf`) originalLines of
             (_, []) ->
-                error $ unlines
-                    [ "While processing the module, I was unable to find a comment with GLOB_IMPORTS_SPLICE."
-                    , "I need this to know where to splice imports into the file. Please add a comment like "
-                    , "this to the source file in the import section: "
-                    , ""
-                    , "-- GLOB_IMPORTS_SPLICE"
-                    ]
+                error $
+                    unlines
+                        [ "While processing the module, I was unable to find a comment with GLOB_IMPORTS_SPLICE."
+                        , "I need this to know where to splice imports into the file. Please add a comment like "
+                        , "this to the source file in the import section: "
+                        , ""
+                        , "-- GLOB_IMPORTS_SPLICE"
+                        ]
             (prior, (_globImportLine : rest)) ->
                 (prior, rest)
 
@@ -202,15 +222,15 @@ renderFile amf originalContents =
                         [ "_importedModules :: [String]"
                         , "_importedModules ="
                         , mkFirstModuleLine firstModule
-                        ] <> map mkRestModuleLine restModules
-                          <> [ "  ]"]
+                        ]
+                            <> map mkRestModuleLine restModules
+                            <> ["  ]"]
          in
             reverse (concat [remainingModule, newLines, lastImportLine])
 
     newImportLines =
         map (\mod' -> "import qualified " <> moduleName mod') (amfModuleImports amf)
 
--- |
 data Module = Module
     { moduleName :: String
     , modulePath :: FilePath
@@ -238,7 +258,7 @@ mkModulePieces fp = do
 
 isLowerFirst :: String -> Bool
 isLowerFirst [] = True
-isLowerFirst (c:_) = isLower c
+isLowerFirst (c : _) = isLower c
 
 pathToModule
     :: FilePath
@@ -247,18 +267,19 @@ pathToModule file = do
     case mkModulePieces file of
         [] ->
             empty
-        x : xs ->  do
+        x : xs -> do
             guard $ all isValidModuleName (x : xs)
-            pure Module
-                { moduleName = intercalate "." (x:xs)
-                , modulePath = file
-                }
+            pure
+                Module
+                    { moduleName = intercalate "." (x : xs)
+                    , modulePath = file
+                    }
 
 -- | Returns True if the given string is a valid task module name.
 -- See `Cabal.Distribution.ModuleName` (http://git.io/bj34)
 isValidModuleName :: String -> Bool
 isValidModuleName [] = False
-isValidModuleName (c:cs) = isUpper c && all isValidModuleChar cs
+isValidModuleName (c : cs) = isUpper c && all isValidModuleChar cs
 
 -- | Returns True if the given Char is a valid taks module character.
 isValidModuleChar :: Char -> Bool
@@ -268,6 +289,6 @@ isValidModuleChar c = isAlphaNum c || c == '_' || c == '\''
 casify :: String -> String
 casify str = intercalate "_" $ groupBy (\a b -> isUpper a && isLower b) str
 
-stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
+stripSuffix :: (Eq a) => [a] -> [a] -> Maybe [a]
 stripSuffix suffix str =
     reverse <$> stripPrefix (reverse suffix) (reverse str)
