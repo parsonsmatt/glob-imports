@@ -135,7 +135,7 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
     let
         (sourceDir, _file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
-        excludePrefixFilter target = not $ foldr ((||) . (`isPrefixOf` target)) False prefixes
+        excludePrefixFilter target = not $ any (`isPrefixOf` target) prefixes
 
     printDebug debug $ "searching directory: " ++ searchDir
     printDebug debug $ "searching with pattern: " ++ pat
