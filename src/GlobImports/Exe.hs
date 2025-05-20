@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | This preprocessor splices in imports to the file you define it in. Haskell
 -- source files are discovered according to a glob relative to the file the code
 -- is defined in. This utility is useful when metaprogramming with a group of
@@ -79,7 +81,7 @@
 module GlobImports.Exe where
 
 import Control.Applicative
-import Control.Monad (guard)
+import Control.Monad (guard, when)
 import Control.Monad.State
 import qualified Data.ByteString.Lazy as LBS
 import Data.Char
@@ -89,6 +91,7 @@ import Data.Foldable (for_)
 import Data.List
 import Data.Maybe
 import Data.String
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Encoding (decodeUtf8)
 import System.Directory
@@ -114,12 +117,7 @@ data AllModelsFile = AllModelsFile
     }
 
 printDebug :: Bool -> String -> IO ()
-printDebug enabled str = do
-    if enabled
-        then
-            putStrLn $ "[DEBUG] " ++ str
-        else
-            pure ()
+printDebug enabled str = when enabled $ putStrLn ("[DEBUG] " ++ str)
 
 -- |
 --
@@ -135,14 +133,14 @@ spliceImports
     -> IO ()
 spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat prefixes debug = do
     let
-        (sourceDir, file) = splitFileName src
+        (sourceDir, _file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
-        excludePrefixFilter :: FilePath -> Bool
-        excludePrefixFilter = \target -> not $ foldr (||) False (fmap (`isPrefixOf` target) prefixes)
+        excludePrefixFilter target = not $ foldr ((||) . (`isPrefixOf` target)) False prefixes
+
     printDebug debug $ "searching directory: " ++ searchDir
     printDebug debug $ "searching with pattern: " ++ pat
     printDebug debug $ "excluding file name: " ++ src
-    eitherFiles <- fmap (filter (/= src)) <$> getFiles searchDir pat
+    eitherFiles <- fmap (filter (essentiallyDistinct src)) <$> getFiles searchDir pat
     files <- case eitherFiles of
         Left e -> error e
         Right f -> pure f
@@ -161,6 +159,18 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
             renderFile input srcContents
 
     writeFile dest output
+    where
+      essentiallyDistinct :: FilePath -> FilePath -> Bool
+      essentiallyDistinct l r = simplifyPath (Text.pack l) /= simplifyPath (Text.pack r)
+
+      simplifyPath :: Text -> Text
+      simplifyPath str =
+        let
+          intermediate = Text.replace "//" "/" str
+        in
+          if intermediate == str
+          then intermediate
+          else simplifyPath intermediate
 
 -- | Returns a list of relative paths to all files in the given directory.
 getFiles
