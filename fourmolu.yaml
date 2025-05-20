@@ -1,0 +1,26 @@
+# Number of spaces per indentation step
+indentation: 4
+
+# Max line length for automatic line breaking
+column-limit: 80
+
+# Styling of arrows in type signatures (choices: trailing, leading, or leading-args)
+function-arrows: leading
+
+# How to place commas in multi-line lists, records, etc. (choices: leading or trailing)
+comma-style: leading
+
+# Styling of import/export lists (choices: leading, trailing, or diff-friendly)
+import-export-style: leading
+
+# Whether to full-indent or half-indent 'where' bindings past the preceding body
+indent-wheres: false
+
+# Number of spaces between top-level declarations
+newlines-between-decls: 1
+
+# How to print Haddock comments (choices: single-line, multi-line, or multi-line-compact)
+haddock-style: single-line
+
+# Give the programmer more choice on where to insert blank lines
+respectful: true
