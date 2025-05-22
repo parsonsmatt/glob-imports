@@ -21,15 +21,20 @@ description:         This package provides an executable for importing modules i
 
 dependencies:
 - base >= 4.12 && < 5
-- mtl
-- filepath
-- dlist
+- bytestring
 - directory
-- template-haskell >= 2.16.0.0
-- file-embed
 - discover-instances
+- dlist
+- file-embed
+- filepath
+- Glob
+- mtl
+- optparse-applicative
 - some-dict-of
+- split
+- template-haskell >= 2.16.0.0
 - text
+- typed-process
 
 ghc-options:
     - -Wall
