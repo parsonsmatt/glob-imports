@@ -49,16 +49,21 @@ library
       TypeOperators
   ghc-options: -Wall
   build-depends:
-      base >=4.12 && <5
+      base >=4.15 && <5
+    , bytestring
     , directory
     , discover-instances
     , dlist
     , file-embed
     , filepath
+    , Glob
     , mtl
     , some-dict-of
+    , split
+    , optparse-applicative
     , template-haskell >=2.16.0.0
     , text
+    , typed-process
   default-language: Haskell2010
 
 executable glob-imports
@@ -84,7 +89,8 @@ executable glob-imports
       TypeOperators
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.12 && <5
+      base >=4.15 && <5
+    , bytestring
     , directory
     , discover-instances
     , dlist
@@ -93,8 +99,12 @@ executable glob-imports
     , glob-imports
     , mtl
     , some-dict-of
+    , split
+    , optparse-applicative
     , template-haskell >=2.16.0.0
     , text
+    , typed-process
+    , Glob
   default-language: Haskell2010
 
 test-suite glob-imports-test
@@ -124,7 +134,8 @@ test-suite glob-imports-test
   build-tool-depends:
       hspec-discover:hspec-discover
   build-depends:
-      base >=4.12 && <5
+      base >=4.15 && <5
+    , bytestring
     , directory
     , discover-instances
     , dlist
@@ -135,6 +146,9 @@ test-suite glob-imports-test
     , hspec-discover
     , mtl
     , some-dict-of
+    , split
     , template-haskell >=2.16.0.0
     , text
+    , typed-process
+    , Glob
   default-language: Haskell2010
