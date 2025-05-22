@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.4.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
 name:           glob-imports
-version:        0.0.1.0
+version:        0.0.2.0
 synopsis:       Import modules for metaprogramming
 description:    This package provides an executable for importing modules in a directory and splicing those in. Please see the README on GitHub at <https://github.com/parsonsmatt/glob-imports#readme>
 category:       Metaprogramming
@@ -49,21 +49,16 @@ library
       TypeOperators
   ghc-options: -Wall
   build-depends:
-      base >=4.15 && <5
-    , bytestring
+      base >=4.12 && <5
     , directory
     , discover-instances
     , dlist
     , file-embed
     , filepath
-    , Glob
     , mtl
     , some-dict-of
-    , split
-    , optparse-applicative
     , template-haskell >=2.16.0.0
     , text
-    , typed-process
   default-language: Haskell2010
 
 executable glob-imports
@@ -89,8 +84,7 @@ executable glob-imports
       TypeOperators
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.15 && <5
-    , bytestring
+      base >=4.12 && <5
     , directory
     , discover-instances
     , dlist
@@ -99,12 +93,8 @@ executable glob-imports
     , glob-imports
     , mtl
     , some-dict-of
-    , split
-    , optparse-applicative
     , template-haskell >=2.16.0.0
     , text
-    , typed-process
-    , Glob
   default-language: Haskell2010
 
 test-suite glob-imports-test
@@ -134,8 +124,7 @@ test-suite glob-imports-test
   build-tool-depends:
       hspec-discover:hspec-discover
   build-depends:
-      base >=4.15 && <5
-    , bytestring
+      base >=4.12 && <5
     , directory
     , discover-instances
     , dlist
@@ -146,9 +135,6 @@ test-suite glob-imports-test
     , hspec-discover
     , mtl
     , some-dict-of
-    , split
     , template-haskell >=2.16.0.0
     , text
-    , typed-process
-    , Glob
   default-language: Haskell2010

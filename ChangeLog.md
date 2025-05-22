@@ -2,6 +2,12 @@
 
 ## Unreleased changes
 
-## 0.1.0.0
+## 0.0.2.0
+
+- [#4](https://github.com/parsonsmatt/glob-imports/pull/4)
+    - You may now pass `--search-dir`, `--pattern`, and `--excluded-prefixes` to
+      configure and customize where the program searches for imports to glob.
+
+## 0.0.1.0
 
 - Initial Release
