@@ -81,22 +81,16 @@
 module GlobImports.Exe where
 
 import Control.Applicative
+import Control.Exception (SomeException, catch)
 import Control.Monad (guard, when)
-import Control.Monad.State
 import qualified Data.ByteString.Lazy as LBS
 import Data.Char
-import Data.DList (DList (..))
-import qualified Data.DList as DList
-import Data.Foldable (for_)
 import Data.List
+import Data.List.Split (splitOn)
 import Data.Maybe
-import Data.String
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Encoding (decodeUtf8)
-import System.Directory
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import System.FilePath
-import System.FilePath.Glob
 import System.Process.Typed
 
 -- | The source file location. This is the first argument passed to the
@@ -161,16 +155,9 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
     writeFile dest output
     where
       essentiallyDistinct :: FilePath -> FilePath -> Bool
-      essentiallyDistinct l r = simplifyPath (Text.pack l) /= simplifyPath (Text.pack r)
-
-      simplifyPath :: Text -> Text
-      simplifyPath str =
-        let
-          intermediate = Text.replace "//" "/" str
-        in
-          if intermediate == str
-          then intermediate
-          else simplifyPath intermediate
+      essentiallyDistinct l r = simplifyPath l /= simplifyPath r
+      simplifyPath :: String -> String
+      simplifyPath = (intercalate "/") . (filter (/= mempty)) . (splitOn "/")
 
 -- | Returns a list of relative paths to all files in the given directory.
 getFiles
@@ -180,10 +167,21 @@ getFiles
     -- ^ The directory to search.
     -> IO (Either String [FilePath])
 getFiles baseDir pat = do
-    (exitCode, out, err) <- readProcess $ proc "find" [baseDir, "-wholename", pat]
+    (exitCode, out, err) <- (readProcess $ proc "find" [baseDir, "-wholename", pat]) `catch` handler
     pure $ case exitCode of
         ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
         ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
+    where
+      handler :: SomeException -> IO (ExitCode, LBS.ByteString, LBS.ByteString)
+      handler e = do
+        pure $ ( ExitFailure 1
+               , ""
+               , mconcat [ "unable to invoke `find`. Please make sure that `find` is executable and in PATH.\n"
+                         , "("
+                         , LBS.fromStrict . encodeUtf8 . Text.pack $ show e
+                         , ")\n"
+                         ]
+               )
 
 renderFile
     :: AllModelsFile
