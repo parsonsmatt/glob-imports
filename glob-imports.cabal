@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           glob-imports
-version:        0.0.2.0
+version:        0.0.2.1
 synopsis:       Import modules for metaprogramming
 description:    This package provides an executable for importing modules in a directory and splicing those in. Please see the README on GitHub at <https://github.com/parsonsmatt/glob-imports#readme>
 category:       Metaprogramming
