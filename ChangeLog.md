@@ -2,6 +2,10 @@
 
 ## Unreleased changes
 
+## 0.0.2.1
+
+- Fixed cabal versions that were missing due to hpack
+
 ## 0.0.2.0
 
 - [#4](https://github.com/parsonsmatt/glob-imports/pull/4)
