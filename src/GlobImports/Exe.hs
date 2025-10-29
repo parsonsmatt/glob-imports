@@ -307,7 +307,10 @@ stripSuffix :: (Eq a) => [a] -> [a] -> Maybe [a]
 stripSuffix suffix str =
     reverse <$> stripPrefix (reverse suffix) (reverse str)
 
+-- | How to qualify imports.
+-- 
+-- @since 0.0.3.0
 data Affix
-    = Prefix
-    | Suffix
+    = Prefix -- ^ @import qualified M@
+    | Suffix -- ^ @import M qualified@
     deriving (Eq, Show)
