@@ -12,6 +12,7 @@ data Args = Args
     , argsPattern :: String
     , argsExcludedPrefixes :: String
     , argsDebug :: Bool
+    , argsImportQualified :: Affix
     }
     deriving (Show)
 
@@ -27,6 +28,7 @@ parseArgs =
                 <*> patternParser
                 <*> excludedPrefixesParser
                 <*> debugParser
+                <*> importQualifiedParser
             )
             mempty
   where
@@ -54,6 +56,16 @@ parseArgs =
         switch $
             long "debug"
                 <> help "Whether to print debug output"
+    stringToAffix x = case x of
+        "pre" -> Just Prefix
+        "post" -> Just Suffix
+        _ -> Nothing
+    importQualifiedParser =
+        option (maybeReader stringToAffix) $
+            long "import-qualified"
+                <> metavar "AFFIX"
+                <> help "pre: import qualified M, post: import M qualified"
+                <> value Prefix
 
 main :: IO ()
 main = do
@@ -67,6 +79,7 @@ main = do
         (argsPattern args)
         (splitOn ',' (argsExcludedPrefixes args))
         (argsDebug args)
+        (argsImportQualified args)
   where
     splitOn _ [] = []
     splitOn sep xs =
