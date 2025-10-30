@@ -1,6 +1,6 @@
 # Changelog for glob-imports
 
-## Unreleased changes
+## 0.0.3.0
 
 - [#7](https://github.com/parsonsmatt/glob-imports/pull/7)
     - Added `--import-qualified` option to allow for `ImportQualifiedPost`.
