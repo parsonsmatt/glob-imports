@@ -22,14 +22,14 @@ spec = do
                         ]
                     }
         it "errors without a GLOB_IMPORTS_SPLICE marker" do
-            (pure $! length (renderFile allModelsFile (unlines
+            (pure $! length (renderFile allModelsFile Prefix (unlines
                 [ "module Foo.Bar where"
                 , ""
                 , "import Blah"
                 ])))
                 `shouldThrow` anyErrorCall
         it "works with a GLOB_IMPORTS_SPLICE marker" do
-            renderFile allModelsFile
+            renderFile allModelsFile Prefix
                 (unlines
                     [ "module Foo.Bar where"
                     , ""
@@ -47,8 +47,27 @@ spec = do
                         , "  [ \"Foo.Bar.Quux\""
                         , "  ]"
                         ]
+        it "works with import qualified post" do
+            renderFile allModelsFile Suffix
+                (unlines
+                    [ "module Foo.Bar where"
+                    , ""
+                    , "import Blah"
+                    , "-- GLOB_IMPORTS_SPLICE"
+                    ])
+                `shouldBe`
+                    unlines
+                        [ "module Foo.Bar where"
+                        , ""
+                        , "import Blah"
+                        , "import Foo.Bar.Quux qualified"
+                        , "_importedModules :: [String]"
+                        , "_importedModules ="
+                        , "  [ \"Foo.Bar.Quux\""
+                        , "  ]"
+                        ]
         it "can handle imports after glob import splice" do
-            renderFile allModelsFile
+            renderFile allModelsFile Prefix
                 (unlines
                     [ "module Foo.Bar where"
                     , ""

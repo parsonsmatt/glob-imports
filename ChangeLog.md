@@ -2,6 +2,9 @@
 
 ## Unreleased changes
 
+- [#7](https://github.com/parsonsmatt/glob-imports/pull/7)
+    - Added `--import-qualified` option to allow for `ImportQualifiedPost`.
+
 ## 0.0.2.1
 
 - Fixed cabal versions that were missing due to hpack

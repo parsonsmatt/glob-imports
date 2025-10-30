@@ -124,8 +124,9 @@ spliceImports
     -> String
     -> [String]
     -> Bool
+    -> Affix
     -> IO ()
-spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat prefixes debug = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat prefixes debug affix = do
     let
         (sourceDir, _file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
@@ -150,7 +151,7 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
                     mapMaybe pathToModule (fmap (searchDir </>) filteredFiles)
                 }
         output =
-            renderFile input srcContents
+            renderFile input affix srcContents
 
     writeFile dest output
     where
@@ -185,9 +186,10 @@ getFiles baseDir pat = do
 
 renderFile
     :: AllModelsFile
+    -> Affix
     -> String
     -> String
-renderFile amf originalContents =
+renderFile amf affix originalContents =
     concatMap
         unlines
         [ modulePrior
@@ -237,7 +239,11 @@ renderFile amf originalContents =
             reverse (concat [remainingModule, newLines, lastImportLine])
 
     newImportLines =
-        map (\mod' -> "import qualified " <> moduleName mod') (amfModuleImports amf)
+        map
+            (\mod' -> case affix of
+                Prefix -> "import qualified " <> moduleName mod'
+                Suffix -> "import " <> moduleName mod' <> " qualified")
+            (amfModuleImports amf)
 
 data Module = Module
     { moduleName :: String
@@ -300,3 +306,11 @@ casify str = intercalate "_" $ groupBy (\a b -> isUpper a && isLower b) str
 stripSuffix :: (Eq a) => [a] -> [a] -> Maybe [a]
 stripSuffix suffix str =
     reverse <$> stripPrefix (reverse suffix) (reverse str)
+
+-- | How to qualify imports.
+-- 
+-- @since 0.0.3.0
+data Affix
+    = Prefix -- ^ @import qualified M@
+    | Suffix -- ^ @import M qualified@
+    deriving (Eq, Show)
