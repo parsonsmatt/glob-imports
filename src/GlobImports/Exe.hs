@@ -160,7 +160,7 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
       simplifyPath :: String -> String
       simplifyPath = (intercalate "/") . (filter (/= mempty)) . (splitOn "/")
 
--- | Returns a list of relative paths to all files in the given directory.
+-- | Returns a sorted list of relative paths to all files in the given directory.
 getFiles
     :: FilePath
     -- ^ The glob pattern to filter with.
@@ -170,7 +170,7 @@ getFiles
 getFiles baseDir pat = do
     (exitCode, out, err) <- (readProcess $ proc "find" [baseDir, "-wholename", pat]) `catch` handler
     pure $ case exitCode of
-        ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
+        ExitSuccess -> Right . sort . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
         ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
     where
       handler :: SomeException -> IO (ExitCode, LBS.ByteString, LBS.ByteString)
