@@ -41,7 +41,7 @@ parseArgs =
                 <> metavar "SEARCH_DIR"
                 <> help "Directory to search for files in"
     patternParser =
-        some $ option str $
+        many $ option str $
             long "pattern"
                 <> metavar "PATTERN"
                 <> help "Pattern on which to match file paths"
