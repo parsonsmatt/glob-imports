@@ -9,7 +9,7 @@ data Args = Args
     , argsSourceFile :: FilePath
     , argsDest :: FilePath
     , argsSearchDir :: Maybe FilePath
-    , argsPattern :: String
+    , argsPattern :: [String]
     , argsExcludedPrefixes :: String
     , argsDebug :: Bool
     , argsImportQualified :: Affix
@@ -41,11 +41,10 @@ parseArgs =
                 <> metavar "SEARCH_DIR"
                 <> help "Directory to search for files in"
     patternParser =
-        option str $
+        some $ option str $
             long "pattern"
                 <> metavar "PATTERN"
                 <> help "Pattern on which to match file paths"
-                <> value "**/*.hs"
     excludedPrefixesParser =
         option str $
             long "exclude-prefixes"
@@ -71,12 +70,16 @@ main :: IO ()
 main = do
     args <- parseArgs
     contents <- readFile' $ argsSourceFile args
+    let pat =
+            if null (argsPattern args)
+                then ["**/*.hs"]
+                else argsPattern args
     spliceImports
         (Source $ argsSourceFile args)
         (SourceContents $ contents)
         (Destination $ argsDest args)
         (argsSearchDir args)
-        (argsPattern args)
+        pat
         (splitOn ',' (argsExcludedPrefixes args))
         (argsDebug args)
         (argsImportQualified args)

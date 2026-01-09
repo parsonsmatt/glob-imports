@@ -121,21 +121,21 @@ spliceImports
     -> SourceContents
     -> Destination
     -> Maybe FilePath
-    -> String
+    -> [String]
     -> [String]
     -> Bool
     -> Affix
     -> IO ()
-spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pat prefixes debug affix = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pats prefixes debug affix = do
     let
         (sourceDir, _file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
         excludePrefixFilter target = not $ any (`isPrefixOf` target) prefixes
 
     printDebug debug $ "searching directory: " ++ searchDir
-    printDebug debug $ "searching with pattern: " ++ pat
+    printDebug debug $ "searching with patterns: " ++ show pats
     printDebug debug $ "excluding file name: " ++ src
-    eitherFiles <- fmap (filter (essentiallyDistinct src)) <$> getFiles searchDir pat
+    eitherFiles <- fmap (filter (essentiallyDistinct src)) <$> getFiles searchDir pats
     files <- case eitherFiles of
         Left e -> error e
         Right f -> pure f
@@ -163,12 +163,13 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
 -- | Returns a list of relative paths to all files in the given directory.
 getFiles
     :: FilePath
-    -- ^ The glob pattern to filter with.
-    -> String
     -- ^ The directory to search.
+    -> [String]
+    -- ^ The glob patterns to filter with.
     -> IO (Either String [FilePath])
-getFiles baseDir pat = do
-    (exitCode, out, err) <- (readProcess $ proc "find" [baseDir, "-wholename", pat]) `catch` handler
+getFiles baseDir pats = do
+    let findExpr = intercalate ["-o"] (map (\p -> ["-wholename", p]) pats)
+    (exitCode, out, err) <- (readProcess $ proc "find" ([baseDir, "("] ++ findExpr ++ [")"])) `catch` handler
     pure $ case exitCode of
         ExitSuccess -> Right . lines . Text.unpack . decodeUtf8 . LBS.toStrict $ out
         ExitFailure _ -> Left . Text.unpack . decodeUtf8 . LBS.toStrict $ err
