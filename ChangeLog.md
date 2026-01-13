@@ -1,5 +1,10 @@
 # Changelog for glob-imports
 
+## 0.0.4.0
+
+- [#8](https://github.com/parsonsmatt/glob-imports/pull/8)
+    - Made the `glob-imports` output deterministic.
+
 ## 0.0.3.0
 
 - [#7](https://github.com/parsonsmatt/glob-imports/pull/7)
