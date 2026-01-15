@@ -43,14 +43,14 @@ parseArgs =
     patternParser =
         option str $
             long "pattern"
-                <> metavar "PATTERN"
-                <> help "Pattern on which to match file paths"
+                <> metavar "PATTERN[,PATTERN...]"
+                <> help "Patterns on which to match file paths (comma separated)"
                 <> value "**/*.hs"
     excludedPrefixesParser =
         option str $
             long "exclude-prefixes"
-                <> metavar "PREFIXES"
-                <> help "File path prefixes to exclude"
+                <> metavar "PREFIX[,PREFIX...]"
+                <> help "File path prefixes to exclude (comma separated)"
                 <> value ""
     debugParser =
         switch $
@@ -76,7 +76,7 @@ main = do
         (SourceContents $ contents)
         (Destination $ argsDest args)
         (argsSearchDir args)
-        (argsPattern args)
+        (splitOn ',' (argsPattern args))
         (splitOn ',' (argsExcludedPrefixes args))
         (argsDebug args)
         (argsImportQualified args)

@@ -1,5 +1,10 @@
 # Changelog for glob-imports
 
+## 0.0.5.0
+
+- [#9](https://github.com/parsonsmatt/glob-imports/pull/9)
+    - The `--pattern` option now accepts multiple patterns, separated by commas.
+
 ## 0.0.4.0
 
 - [#8](https://github.com/parsonsmatt/glob-imports/pull/8)
