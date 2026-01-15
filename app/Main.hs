@@ -43,13 +43,13 @@ parseArgs =
     patternParser =
         option str $
             long "pattern"
-                <> metavar "PATTERN"
+                <> metavar "PATTERN[,PATTERN...]"
                 <> help "Patterns on which to match file paths (comma separated)"
                 <> value "**/*.hs"
     excludedPrefixesParser =
         option str $
             long "exclude-prefixes"
-                <> metavar "PREFIXES"
+                <> metavar "PREFIX[,PREFIX...]"
                 <> help "File path prefixes to exclude (comma separated)"
                 <> value ""
     debugParser =
