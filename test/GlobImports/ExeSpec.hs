@@ -22,14 +22,14 @@ spec = do
                         ]
                     }
         it "errors without a GLOB_IMPORTS_SPLICE marker" do
-            (pure $! length (renderFile allModelsFile Prefix (unlines
+            (pure $! length (renderFile allModelsFile Prefix False (unlines
                 [ "module Foo.Bar where"
                 , ""
                 , "import Blah"
                 ])))
                 `shouldThrow` anyErrorCall
         it "works with a GLOB_IMPORTS_SPLICE marker" do
-            renderFile allModelsFile Prefix
+            renderFile allModelsFile Prefix False
                 (unlines
                     [ "module Foo.Bar where"
                     , ""
@@ -48,7 +48,7 @@ spec = do
                         , "  ]"
                         ]
         it "works with import qualified post" do
-            renderFile allModelsFile Suffix
+            renderFile allModelsFile Suffix False
                 (unlines
                     [ "module Foo.Bar where"
                     , ""
@@ -67,7 +67,7 @@ spec = do
                         , "  ]"
                         ]
         it "can handle imports after glob import splice" do
-            renderFile allModelsFile Prefix
+            renderFile allModelsFile Prefix False
                 (unlines
                     [ "module Foo.Bar where"
                     , ""
@@ -90,6 +90,36 @@ spec = do
                         , "  [ \"Foo.Bar.Quux\""
                         , "  ]"
                         , ""
+                        , "baz :: Int"
+                        , "baz = 3"
+                        ]
+        it "emits LINE pragmas for the original source" do
+            renderFile allModelsFile Prefix True
+                (unlines
+                    [ "module Foo.Bar where"
+                    , ""
+                    , "import Blah"
+                    , "-- GLOB_IMPORTS_SPLICE"
+                    , "baz :: Int"
+                    , "baz = 3"
+                    ])
+                `shouldBe`
+                    unlines
+                        [ "{-# LINE 1 \"src/Foo/Bar.hs\" #-}"
+                        , "module Foo.Bar where"
+                        , ""
+                        , "import Blah"
+                        , "{-# LINE 4 \"src/Foo/Bar.hs\" #-}"
+                        , "import qualified Foo.Bar.Quux"
+                        , "{-# LINE 4 \"src/Foo/Bar.hs\" #-}"
+                        , "_importedModules :: [String]"
+                        , "{-# LINE 4 \"src/Foo/Bar.hs\" #-}"
+                        , "_importedModules ="
+                        , "{-# LINE 4 \"src/Foo/Bar.hs\" #-}"
+                        , "  [ \"Foo.Bar.Quux\""
+                        , "{-# LINE 4 \"src/Foo/Bar.hs\" #-}"
+                        , "  ]"
+                        , "{-# LINE 5 \"src/Foo/Bar.hs\" #-}"
                         , "baz :: Int"
                         , "baz = 3"
                         ]
