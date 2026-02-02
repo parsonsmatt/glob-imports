@@ -1,5 +1,11 @@
 # Changelog for glob-imports
 
+## 0.0.6.0
+
+- [#11](https://github.com/parsonsmatt/glob-imports/pull/11)
+    - `glob-imports` now emits `LINE` pragmas by default to make error messages
+      better.
+
 ## 0.0.5.0
 
 - [#9](https://github.com/parsonsmatt/glob-imports/pull/9)
