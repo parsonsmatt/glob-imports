@@ -12,6 +12,7 @@ data Args = Args
     , argsPattern :: String
     , argsExcludedPrefixes :: String
     , argsDebug :: Bool
+    , argsLinePragmas :: Bool
     , argsImportQualified :: Affix
     }
     deriving (Show)
@@ -28,6 +29,7 @@ parseArgs =
                 <*> patternParser
                 <*> excludedPrefixesParser
                 <*> debugParser
+                <*> linePragmasParser
                 <*> importQualifiedParser
             )
             mempty
@@ -56,6 +58,10 @@ parseArgs =
         switch $
             long "debug"
                 <> help "Whether to print debug output"
+    linePragmasParser =
+        fmap not . switch $
+            long "no-line-pragmas"
+                <> help "Do not emit {-# LINE #-} pragmas around generated code"
     stringToAffix x = case x of
         "pre" -> Just Prefix
         "post" -> Just Suffix
@@ -79,6 +85,7 @@ main = do
         (splitOn ',' (argsPattern args))
         (splitOn ',' (argsExcludedPrefixes args))
         (argsDebug args)
+        (argsLinePragmas args)
         (argsImportQualified args)
   where
     splitOn _ [] = []

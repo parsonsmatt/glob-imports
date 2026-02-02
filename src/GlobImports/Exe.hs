@@ -124,9 +124,10 @@ spliceImports
     -> [String]
     -> [String]
     -> Bool
+    -> Bool
     -> Affix
     -> IO ()
-spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pats prefixes debug affix = do
+spliceImports (Source src) (SourceContents srcContents) (Destination dest) msearchDir pats prefixes debug linePragmas affix = do
     let
         (sourceDir, _file) = splitFileName src
         searchDir = fromMaybe sourceDir msearchDir
@@ -151,7 +152,7 @@ spliceImports (Source src) (SourceContents srcContents) (Destination dest) msear
                     mapMaybe pathToModule (fmap (searchDir </>) filteredFiles)
                 }
         output =
-            renderFile input affix srcContents
+            renderFile input affix linePragmas srcContents
 
     writeFile dest output
     where
@@ -188,15 +189,15 @@ getFiles baseDir pats = do
 renderFile
     :: AllModelsFile
     -> Affix
+    -> Bool
     -> String
     -> String
-renderFile amf affix originalContents =
-    concatMap
-        unlines
-        [ modulePrior
-        , newImportLines
-        , newModuleRest
-        ]
+renderFile amf affix linePragmas originalContents =
+    unlines $
+        topPragma
+            ++ modulePrior
+            ++ newImportLines
+            ++ newModuleRest
   where
     originalLines =
         lines originalContents
@@ -215,6 +216,21 @@ renderFile amf affix originalContents =
             (prior, (_globImportLine : rest)) ->
                 (prior, rest)
 
+    modulePath' =
+        modulePath (amfModuleBase amf)
+
+    topPragma =
+        [linePragma 1 | linePragmas]
+
+    linePragma n =
+        "{-# LINE " <> show n <> " \"" <> modulePath' <> "\" #-}"
+
+    spliceLineNumber =
+        length modulePrior + 1
+
+    resumeLineNumber =
+        length modulePrior + 2
+
     newModuleRest =
         let
             (remainingModule, lastImportLine) =
@@ -225,8 +241,8 @@ renderFile amf affix originalContents =
                 "  [ " <> quoteModuleName mod'
             mkRestModuleLine mod' =
                 "  , " <> quoteModuleName mod'
-            newLines =
-                reverse case amfModuleImports amf of
+            generatedBlock =
+                case amfModuleImports amf of
                     [] ->
                         []
                     (firstModule : restModules) ->
@@ -236,15 +252,29 @@ renderFile amf affix originalContents =
                         ]
                             <> map mkRestModuleLine restModules
                             <> ["  ]"]
+            annotatedNewLines =
+                reverse (annotateGenerated generatedBlock)
+            remainingWithPragma =
+                case (linePragmas, remainingModule) of
+                    (True, _ : _) ->
+                        remainingModule <> [linePragma resumeLineNumber]
+                    _ ->
+                        remainingModule
          in
-            reverse (concat [remainingModule, newLines, lastImportLine])
+            reverse (concat [remainingWithPragma, annotatedNewLines, lastImportLine])
+
+    annotateGenerated xs =
+        if linePragmas
+            then concatMap (\ln -> [linePragma spliceLineNumber, ln]) xs
+            else xs
 
     newImportLines =
-        map
-            (\mod' -> case affix of
-                Prefix -> "import qualified " <> moduleName mod'
-                Suffix -> "import " <> moduleName mod' <> " qualified")
-            (amfModuleImports amf)
+        annotateGenerated $
+            map
+                (\mod' -> case affix of
+                    Prefix -> "import qualified " <> moduleName mod'
+                    Suffix -> "import " <> moduleName mod' <> " qualified")
+                (amfModuleImports amf)
 
 data Module = Module
     { moduleName :: String
