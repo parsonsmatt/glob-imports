@@ -21,7 +21,6 @@ jobs:
           - "9.8"
           - "9.10"
           - "9.12"
-          - "9.14"
     env:
       CONFIG: "--enable-tests"
     steps:
